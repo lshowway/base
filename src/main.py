@@ -5,13 +5,14 @@ from src.models.llama_wrapper import LlamaWrapper
 from src.analysis.direction_finder import DirectionFinder
 from src.analysis.ffn_analyzer import FFNAnalyzer
 from src.analysis.logits_analyzer import LogitsAnalyzer
+from src.analysis.lipschitzness_analyzer import LipschitzAnalyzer
 
 def parse_args():
     parser = argparse.ArgumentParser(description='LLaMA分析工具')
     
     # 必需参数
     parser.add_argument('--task', type=str, required=True,
-                      choices=['task1','task2','task3','task4_1','task4_2','task4_3'],
+                      choices=['task1','task2','task3','task4_1','task4_2','task4_3','lipschitz'],
                       help='要执行的任务')
     parser.add_argument('--base_model', type=str, required=True,
                       help='base模型路径')
@@ -57,8 +58,12 @@ def main():
         analyzer.analyze()
         
     elif config.task == 'task4_3':
-        finder = DirectionFinder(config)
-        finder.analyze()
+        analyzer = DirectionFinder(config)
+        analyzer.analyze()
+        
+    elif config.task == 'lipschitz':
+        analyzer = LipschitzAnalyzer(config)
+        analyzer.analyze()
         
     elif config.task in ['task1', 'task2', 'task3']:
         model_base = LlamaWrapper(config.base_model_path)

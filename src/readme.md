@@ -2,9 +2,7 @@
 
 本项目提供了一套工具来分析和比较LLaMA base和chat模型的行为差异。主要关注四个方面的分析：模型输出比较、内部状态分析、生成过程分析和深入机制分析。
 
-## 项目结构
-
-```
+## 项目结构```
 .
 ├── main.py                 # 主程序入口
 ├── src/
@@ -15,15 +13,15 @@
 │   │   ├── __init__.py
 │   │   ├── direction_finder.py  # 模型方向分析
 │   │   ├── ffn_analyzer.py      # FFN层分析
-│   │   └── logits_analyzer.py   # logits分析
+│   │   ├── logits_analyzer.py   # logits分析
+│   │   └── lipschitzness_analyzer.py # Lipschitz分析
 │   ├── visualization/     # 可视化工具
 │   │   ├── __init__.py
 │   │   └── plotters.py    # 绘图函数
 │   └── utils/            # 工具函数
 │       ├── __init__.py
 │       └── config.py     # 配置类
-└── README.md
-```
+└── README.md```
 
 ### 安装依赖
 
@@ -49,7 +47,11 @@ python main.py --task task4_3 \
     --layer_idx 0.3 \
     --n_components 10
 ```
-
+python main.py --task lipschitz \
+   --base_model /path/to/llama2-base \
+    --chat_model /path/to/llama2-chat \
+    --dataset test_dataset.json \
+    --output_dir outputs/lipschitz
 ### 配置参数
 详见 `src/utils/config.py` 中的 `Config` 类定义。
 
@@ -131,6 +133,10 @@ python main.py --task task4_3 \
 - 实现：`DirectionFinder`
 - 目标：寻找base到chat的转换方向
 - 方法：使用PLS回归分析hidden states
+### 5 Lipschitz分析
+- 实现：`LipschitzAnalyzer`
+- 目标：分析模型在输入扰动下的输出变化
+- 方法：计算Lipschitz常数
 
 ## 实现细节
 
@@ -155,3 +161,5 @@ python main.py --task task4_3 \
 ## 使用方法
 
 ### 安装依赖
+
+

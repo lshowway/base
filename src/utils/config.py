@@ -25,3 +25,8 @@ class Config:
     # 中文相关配置
     use_chinese: bool = True  # 是否使用中文
     chinese_prompt_template: str = "问题：{}\n回答："  # 中文提示模板
+    
+    # Lipschitz分析相关配置
+    num_layers: int = 32  # 分析的层数
+    num_perturbations: int = 100  # 每层扰动次数
+    perturbation_epsilon: float = 1e-2  # 扰动大小
