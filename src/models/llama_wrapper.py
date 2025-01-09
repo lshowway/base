@@ -68,24 +68,32 @@ class LlamaWrapper:
                 break
         
         return generated, ffn_activations_list, hidden_states_list, logits_list, generated_tokens, generated_logits
-    
-    def compare_outputs(self, other_model: 'LlamaWrapper', config: 'Config'):
-        """任务1: 比较两个模型的输出"""
+
+    def _load_and_process_dataset(self, config: 'Config'):
+        """加载并预处理数据集"""
         with open(config.dataset_path, 'r') as f:
             dataset = json.load(f)
         
         if config.max_samples:
             dataset = dataset[:config.max_samples]
-            
+        return dataset
+
+    def _get_model_outputs(self, input_text: str):
+        """获取模型输出"""
+        input_ids = self.tokenizer(input_text, return_tensors="pt").input_ids.to(self.device)
+        return self.generate(input_ids)
+    
+    def compare_outputs(self, other_model: 'LlamaWrapper', config: 'Config'):
+        """任务1: 比较两个模型的输出"""
+        dataset = self._load_and_process_dataset(config)
         results = []
+        
         for item in tqdm(dataset, desc="处理数据"):
             input_text = item['question']
-            input_ids = self.tokenizer(input_text, return_tensors="pt").input_ids.to(self.device)
-            other_input_ids = other_model.tokenizer(input_text, return_tensors="pt").input_ids.to(self.device)
             
             # 获取两个模型的输出
-            _, _, _, logits_base, tokens_base, _ = self.generate(input_ids)
-            _, _, _, logits_chat, tokens_chat, _ = other_model.generate(other_input_ids)
+            _, _, _, logits_base, tokens_base, _ = self._get_model_outputs(input_text)
+            _, _, _, logits_chat, tokens_chat, _ = other_model._get_model_outputs(input_text)
             
             results.append({
                 'input': input_text,
@@ -102,20 +110,14 @@ class LlamaWrapper:
     
     def analyze_internals(self, other_model: 'LlamaWrapper', config: 'Config'):
         """任务2: 分析模型内部状态"""
-        with open(config.dataset_path, 'r') as f:
-            dataset = json.load(f)
-        
-        if config.max_samples:
-            dataset = dataset[:config.max_samples]
+        dataset = self._load_and_process_dataset(config)
             
         for idx, item in enumerate(tqdm(dataset, desc="分析内部状态")):
             input_text = item['question']
-            input_ids = self.tokenizer(input_text, return_tensors="pt").input_ids.to(self.device)
-            other_input_ids = other_model.tokenizer(input_text, return_tensors="pt").input_ids.to(self.device)
             
             # 获取两个模型的激活值
-            _, ffn_base, hidden_base, _, _, _ = self.generate(input_ids)
-            _, ffn_chat, hidden_chat, _, _, _ = other_model.generate(other_input_ids)
+            _, ffn_base, hidden_base, _, _, _ = self._get_model_outputs(input_text)
+            _, ffn_chat, hidden_chat, _, _, _ = other_model._get_model_outputs(input_text)
             
             # 绘制FFN激活值对比图
             plot_ffn_activations(
@@ -131,20 +133,14 @@ class LlamaWrapper:
     
     def analyze_generation(self, other_model: 'LlamaWrapper', config: 'Config'):
         """任务3: 分析生成过程"""
-        with open(config.dataset_path, 'r') as f:
-            dataset = json.load(f)
-        
-        if config.max_samples:
-            dataset = dataset[:config.max_samples]
+        dataset = self._load_and_process_dataset(config)
             
         for idx, item in enumerate(tqdm(dataset, desc="分析生成过程")):
             input_text = item['question']
-            input_ids = self.tokenizer(input_text, return_tensors="pt").input_ids.to(self.device)
-            other_input_ids = other_model.tokenizer(input_text, return_tensors="pt").input_ids.to(self.device)
             
             # 获取生成过程的数据
-            _, _, _, logits_base, tokens_base, logits_values_base = self.generate(input_ids)
-            _, _, _, logits_chat, tokens_chat, logits_values_chat = other_model.generate(other_input_ids)
+            _, _, _, logits_base, tokens_base, logits_values_base = self._get_model_outputs(input_text)
+            _, _, _, logits_chat, tokens_chat, logits_values_chat = other_model._get_model_outputs(input_text)
             
             # 绘制生成token的logit值变化
             plot_generated_token_logits(
