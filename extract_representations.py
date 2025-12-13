@@ -7,6 +7,7 @@ Optimized logic:
 - Dtype control: Separate model computation dtype and output storage dtype
 """
 import os
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 import argparse
 import logging
 import torch
@@ -53,9 +54,12 @@ def parse_args():
     # Model Selection (Combined family/scale)
     parser.add_argument('--models', type=str, nargs='+', default=['qwen25/14b'],
                         choices=['llama32/1b', 'llama32/3b', 'gemma3/1b', 'gemma3/27b', 'mistral/7b',
-                                 'olmo2/13b', 'olmo2/32b', 'qwen25/7b', 'qwen25/14b', 'qwen25/32b', 'qwen25/72b'],
+                                 'qwen25/7b', 'qwen25/14b', 'qwen25/32b', 'qwen25/72b',
+                                 'olmo2/1b', 'olmo2/7b', 'olmo2/13b', 'olmo2/32b'],
+                        # choices=['mistral/7b',
+                        #          'olmo2/1b', 'olmo2/7b', 'olmo2/13b', 'olmo2/32b'],
                         help='Model configs in format "family/scale" (e.g. "llama32/1b" "qwen25/7b")')
-    parser.add_argument('--variant', type=str, nargs='+', default=['base', 'instruct'],
+    parser.add_argument('--variant', type=str, nargs='+', default=['base', 'sft', 'dpo', 'rlvr', 'instruct'],
                         choices=['base', 'instruct'],
                         help='Model variants to process for each model')
 
@@ -69,7 +73,7 @@ def parse_args():
                         help='Layer sampling strategy')
 
     # Computation arguments
-    parser.add_argument('--batch_size', type=int, default=16,
+    parser.add_argument('--batch_size', type=int, default=32,
                         help='Batch size')
     parser.add_argument('--device_map', type=str, default='auto',
                         help='Device map for model')
@@ -290,9 +294,9 @@ def main():
             raise ValueError(f"Unknown dataset: {dataset_name}")
 
     logger.info("=" * 80)
-    logger.info(f"Target Models: {parsed_models}")
-    logger.info(f"Target Variants: {args.variant}")
-    logger.info(f"Target Datasets: {args.dataset}")
+    logger.info(f" ✅ Target Models: {parsed_models}")
+    logger.info(f" ✅ Target Variants: {args.variant}")
+    logger.info(f" ⭕️ Target Datasets: {args.dataset}")
     logger.info(f"Dtypes -> Model: {args.model_dtype} | Save: {args.save_dtype}")
     logger.info("=" * 80)
 
@@ -308,7 +312,7 @@ def main():
                 continue
 
             logger.info(f"\n{'=' * 40}")
-            logger.info(f"Loading Model: {family}-{scale}-{variant}")
+            logger.info(f" ❤️ Loading Model: {family}-{scale}-{variant}")
             logger.info(f"{'=' * 40}")
 
             try:

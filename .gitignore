@@ -317,3 +317,4 @@ coverage.xml
 # Slurm job files
 slurm-*.out
 *.slurm
+/scripts/
