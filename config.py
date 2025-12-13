@@ -40,8 +40,8 @@ MODEL_CONFIGS = {
             'base': 'allenai/OLMo-2-1124-7B',
             'sft': 'allenai/OLMo-2-1124-7B-SFT',
             'dpo': 'allenai/OLMo-2-1124-7B-DPO',
-            # 'rlvr': 'allenai/OLMo-2-1124-7B-Instruct', # 7B/13B 的 Instruct 通常即为 RLVR 后的产物
-            'instruct': 'allenai/OLMo-2-1124-7B-Instruct',
+            'rlvr': 'allenai/OLMo-2-1124-7B-Instruct', # 7B/13B 的 Instruct 通常即为 RLVR 后的产物
+            # 'instruct': 'allenai/OLMo-2-1124-7B-Instruct',
             'num_layers': 32, # Confirmed
         },
         # 13B: 中间件齐全，适合做中等规模实验
@@ -49,8 +49,8 @@ MODEL_CONFIGS = {
             'base': 'allenai/OLMo-2-1124-13B',
             'sft': 'allenai/OLMo-2-1124-13B-SFT',
             'dpo': 'allenai/OLMo-2-1124-13B-DPO',
-            # 'rlvr': 'allenai/OLMo-2-1124-13B-Instruct',
-            'instruct': 'allenai/OLMo-2-1124-13B-Instruct',
+            'rlvr': 'allenai/OLMo-2-1124-13B-Instruct',
+            # 'instruct': 'allenai/OLMo-2-1124-13B-Instruct',
             'num_layers': 40, # Confirmed
         },
         # 32B: 最新的大杯模型 (0325 版本)
@@ -58,8 +58,8 @@ MODEL_CONFIGS = {
             'base': 'allenai/OLMo-2-0325-32B',
             'sft': 'allenai/OLMo-2-0325-32B-SFT',
             'dpo': 'allenai/OLMo-2-0325-32B-DPO', # 存在于官方 Repo 树中
-            # 'rlvr': 'allenai/OLMo-2-0325-32B-Instruct',
-            'instruct': 'allenai/OLMo-2-0325-32B-Instruct',
+            'rlvr': 'allenai/OLMo-2-0325-32B-Instruct',
+            # 'instruct': 'allenai/OLMo-2-0325-32B-Instruct',
             'num_layers': 64, # Estimated, verify with config.json
         },
     },
@@ -110,75 +110,6 @@ MODEL_CONFIGS = {
         },
     },
 }
-# MODEL_CONFIGS = {
-#     'gemma3': {
-#         '1b': {
-#             'base': 'google/gemma-3-1b-pt',
-#             'instruct': 'google/gemma-3-1b-it',
-#             'num_layers': 18,
-#         },
-#         '27b': {
-#             'base': 'google/gemma-3-27b-pt',
-#             'instruct': 'google/gemma-3-27b-it',
-#             'num_layers': 46,
-#         },
-#     },
-#     'qwen25': {
-#         '7b': {
-#             'base': 'Qwen/Qwen2.5-7B',
-#             'instruct': 'Qwen/Qwen2.5-7B-Instruct',
-#             'num_layers': 28,
-#         },
-#         '14b': {
-#             'base': 'Qwen/Qwen2.5-14B',
-#             'instruct': 'Qwen/Qwen2.5-14B-Instruct',
-#             'num_layers': 48,
-#         },
-#         '32b': {
-#             'base': 'Qwen/Qwen2.5-32B',
-#             'instruct': 'Qwen/Qwen2.5-32B-Instruct',
-#             'num_layers': 64,
-#         },
-#         '72b': {
-#             'base': 'Qwen/Qwen2.5-72B',
-#             'instruct': 'Qwen/Qwen2.5-72B-Instruct',
-#             'num_layers': 80,
-#         },
-#     },
-#     'mistral': {
-#         '7b': {
-#             'base': 'mistralai/Mistral-7B-v0.1',
-#             'instruct': 'mistralai/Mistral-7B-Instruct-v0.1',
-#             'num_layers': 32,
-#         },
-#     },
-#     'olmo2': {
-#         '13b': {
-#             'base': 'allenai/OLMo-2-1124-13B',
-#             'instruct': 'allenai/OLMo-2-1124-13B-Instruct',
-#             'num_layers': 40,
-#         },
-#         '32b': {
-#             'base': 'allenai/OLMo-2-0325-32B',
-#             'instruct': 'allenai/OLMo-2-0325-32B-Instruct',
-#             'num_layers': 48,
-#         },
-#     },
-#     'llama32': {
-#         '1b': {
-#             'base': 'meta-llama/Llama-3.2-1B',
-#             'instruct': 'meta-llama/Llama-3.2-1B-Instruct',
-#             'num_layers': 16,
-#         },
-#         '3b': {
-#             'base': 'meta-llama/Llama-3.2-3B',
-#             'instruct': 'meta-llama/Llama-3.2-3B-Instruct',
-#             'num_layers': 28,
-#         },
-#     },
-# }
-
-
 # ============================================================================
 # Dataset Configurations
 # ============================================================================

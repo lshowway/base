@@ -60,7 +60,7 @@ def load_model(
     # Download only mode - use snapshot_download to avoid OOM
     # -----------------------------------------------------------
     if download_only:
-        logger.info(f"Starting download for {model_path} (Files only, no RAM loading)...")
+        logger.info(f" ✅ Starting download for {model_path} (Files only, no RAM loading)...")
         try:
             snapshot_download(
                 repo_id=model_path,
@@ -68,7 +68,7 @@ def load_model(
                 max_workers=1,  # <--- 【添加这一行】强制使用单线程（一个文件一个文件下载）
                 # If HF_TOKEN is set in environment, it will be used automatically
             )
-            logger.info(f"✓ Successfully downloaded {model_family}-{scale}-{variant} to {cache_dir}")
+            logger.info(f" ✅  Successfully downloaded {model_family}-{scale}-{variant} to {cache_dir}")
         except Exception as e:
             logger.error(f"Download failed: {e}")
             raise e
@@ -104,10 +104,10 @@ def load_model(
 
     model.eval()
 
-    logger.info(f"✓ Loaded {model_family}-{scale}-{variant}")
-    logger.info(f"  Device map: {model.hf_device_map if hasattr(model, 'hf_device_map') else device_map}")
-    logger.info(f"  Dtype: {torch_dtype}")
-    logger.info(f"  Cache dir: {cache_dir}")
+    logger.info(f" ✅  Loaded {model_family}-{scale}-{variant}")
+    logger.info(f" ✅  Device map: {model.hf_device_map if hasattr(model, 'hf_device_map') else device_map}")
+    logger.info(f" ✅  Dtype: {torch_dtype}")
+    logger.info(f" ✅ Cache dir: {cache_dir}")
 
     return model, tokenizer
 

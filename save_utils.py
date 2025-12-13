@@ -60,6 +60,7 @@ def save_representation(save_path: str, sample_data: Dict):
 
     try:
         torch.save(sample_data, temp_path)
+        logger.info(f" ✅ saved to: {temp_path}")
         os.rename(temp_path, save_path)
     except Exception as e:
         # Clean up temp file on error
@@ -129,7 +130,7 @@ def save_checkpoint(
         json.dump(checkpoint, f, indent=2)
     os.rename(temp_path, checkpoint_path)
 
-    logger.info(f"  Checkpoint saved: {len(processed_ids)}/{total_samples} pooled, " +
+    logger.info(f"  ✅  Checkpoint saved: {len(processed_ids)}/{total_samples} pooled, " +
                 f"{len(processed_token_ids) if processed_token_ids else 0} token-level")
 
 
@@ -166,7 +167,7 @@ def load_checkpoint(
         checkpoint['processed_token_sample_ids'] = []
         checkpoint['num_token_processed'] = 0
 
-    logger.info(f"  Loaded checkpoint: {checkpoint['num_processed']}/{checkpoint.get('total_samples', '?')} pooled, " +
+    logger.info(f"  ✅  Loaded checkpoint: {checkpoint['num_processed']}/{checkpoint.get('total_samples', '?')} pooled, " +
                 f"{checkpoint['num_token_processed']} token-level")
 
     return checkpoint

@@ -21,11 +21,11 @@ def download_dataset(dataset_name: str, cache_dir: str = DATASET_CACHE_DIR) -> D
 
     # 如果本地已存在，直接加载
     if os.path.exists(local_path):
-        logger.info(f"Loading {dataset_name} from local disk: {local_path}")
+        logger.info(f" ✅ Loading {dataset_name} from local disk: {local_path}")
         return load_from_disk(local_path)
 
     # 否则从 HuggingFace 下载
-    logger.info(f"Downloading {dataset_name} from HuggingFace...")
+    logger.info(f" ✅ Downloading {dataset_name} from HuggingFace...")
     if config['subset']:
         dataset = load_dataset(
             config['hf_name'],
@@ -215,7 +215,7 @@ def create_dataloader(
             formatted_texts.append(text)
             valid_indices.append(idx)
 
-    logger.info(f"Formatted {len(formatted_texts)}/{len(dataset)} samples")
+    logger.info(f"  ✅ Formatted {len(formatted_texts)}/{len(dataset)} samples")
 
     # Tokenize
     encoded = tokenizer(

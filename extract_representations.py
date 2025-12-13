@@ -52,15 +52,16 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Extract representations from language models')
 
     # Model Selection (Combined family/scale)
-    parser.add_argument('--models', type=str, nargs='+', default=['qwen25/14b'],
+    parser.add_argument('--models', type=str, nargs='+', default=['olmo2/1b'],
                         choices=['llama32/1b', 'llama32/3b', 'gemma3/1b', 'gemma3/27b', 'mistral/7b',
                                  'qwen25/7b', 'qwen25/14b', 'qwen25/32b', 'qwen25/72b',
                                  'olmo2/1b', 'olmo2/7b', 'olmo2/13b', 'olmo2/32b'],
                         # choices=['mistral/7b',
                         #          'olmo2/1b', 'olmo2/7b', 'olmo2/13b', 'olmo2/32b'],
                         help='Model configs in format "family/scale" (e.g. "llama32/1b" "qwen25/7b")')
+
     parser.add_argument('--variant', type=str, nargs='+', default=['base', 'sft', 'dpo', 'rlvr', 'instruct'],
-                        choices=['base', 'instruct'],
+                        choices=['base', 'sft', 'dpo', 'rlvr', 'instruct'],  # <--- 这里增加了选项
                         help='Model variants to process for each model')
 
     # Dataset arguments
@@ -178,7 +179,7 @@ def process_dataset_with_model(
         max_length
     )
 
-    logger.info(f"    Starting extraction for {len(remaining_indices)} samples...")
+    logger.info(f"  ✅    Starting extraction for {len(remaining_indices)} samples...")
 
     token_level_count = 0
     pooled_only_count = 0
@@ -266,6 +267,7 @@ def process_dataset_with_model(
         model_family, scale, variant, dataset_name,
         list(processed_ids), len(dataset_sampled)
     )
+    logger.info(f"  ✅✅✅✅   Extracting Representations End~~✅ ✅ ✅ ")
 
 
 def main():
@@ -293,12 +295,12 @@ def main():
         if dataset_name not in DATASET_CONFIGS:
             raise ValueError(f"Unknown dataset: {dataset_name}")
 
-    logger.info("=" * 80)
+    logger.info("=" * 20)
     logger.info(f" ✅ Target Models: {parsed_models}")
     logger.info(f" ✅ Target Variants: {args.variant}")
     logger.info(f" ⭕️ Target Datasets: {args.dataset}")
     logger.info(f"Dtypes -> Model: {args.model_dtype} | Save: {args.save_dtype}")
-    logger.info("=" * 80)
+    logger.info("=" * 20)
 
     # Outer Loop: Model Family/Scale
     # We load the model once, run all variants/datasets, then unload.
@@ -311,7 +313,7 @@ def main():
                 logger.warning(f"Variant {variant} not found for {family}/{scale}, skipping...")
                 continue
 
-            logger.info(f"\n{'=' * 40}")
+            logger.info(f"{'=' * 40}")
             logger.info(f" ❤️ Loading Model: {family}-{scale}-{variant}")
             logger.info(f"{'=' * 40}")
 
@@ -340,7 +342,7 @@ def main():
                         logger
                     )
 
-                logger.info(f"Completed all datasets for {family}-{scale}-{variant}")
+                logger.info(f" ✅ Completed all datasets for {family}-{scale}-{variant}")
 
             except Exception as e:
                 logger.error(f"Error processing {family}-{scale}-{variant}: {e}", exc_info=True)
@@ -356,9 +358,9 @@ def main():
                 torch.cuda.empty_cache()
                 logger.info("GPU memory cleared.\n")
 
-    logger.info("\n" + "=" * 80)
-    logger.info("✓ ALL TASKS COMPLETED")
-    logger.info("=" * 80)
+    logger.info("=" * 20)
+    logger.info(" ✅  ALL TASKS COMPLETED")
+    logger.info("=" * 20)
 
 
 if __name__ == '__main__':
