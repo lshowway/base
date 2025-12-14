@@ -52,7 +52,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Extract representations from language models')
 
     # Model Selection (Combined family/scale)
-    parser.add_argument('--models', type=str, nargs='+', default=['olmo2/1b'],
+    parser.add_argument('--models', type=str, nargs='+', default=['olmo2/32b'],
                         choices=['llama32/1b', 'llama32/3b', 'gemma3/1b', 'gemma3/27b', 'mistral/7b',
                                  'qwen25/7b', 'qwen25/14b', 'qwen25/32b', 'qwen25/72b',
                                  'olmo2/1b', 'olmo2/7b', 'olmo2/13b', 'olmo2/32b'],

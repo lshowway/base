@@ -50,7 +50,7 @@ def setup_logging():
 def parse_args():
     parser = argparse.ArgumentParser(description='Compute metrics for Base/SFT/DPO/RLVR/Instruct')
 
-    parser.add_argument('--models', type=str, nargs='+', default=['olmo2/1b'],
+    parser.add_argument('--models', type=str, nargs='+', default=['olmo2/7b'],
                         help='Model configs in format "family/scale"')
 
     parser.add_argument('--dataset', type=str, default='mmlu',
@@ -375,10 +375,12 @@ def visualize_results(results_store, output_dir):
 
             if has_data:
                 title = f"{metric_name} - {sub_key}" if sub_key else metric_name
+                plt.ylim(0.0, 1.0)
+
                 plt.title(title, fontsize=14)
                 plt.xlabel("Layer Depth", fontsize=12)
                 plt.ylabel("Value", fontsize=12)
-                plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left') # Legend outside
+                plt.legend(loc='upper center', ncol=2) # Legend outside
                 plt.grid(True, linestyle='--', alpha=0.3)
                 plt.tight_layout()
 
@@ -408,7 +410,7 @@ def main():
     else:
         for model_str in args.models:
             family, scale = model_str.split('/')
-            logger.info(f"{'='*40}📦 [Model] Processing {family}/{scale}\n{'='*40}")
+            logger.info(f"{'='*40}📦 [Model] Processing {family}/{scale}{'='*40}")
 
             # ------------------------------------------------------------
             # 1. 加载和计算 BASE (常驻内存)
