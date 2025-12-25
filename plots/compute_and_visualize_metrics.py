@@ -28,6 +28,7 @@ from datetime import datetime
 import sys
 sys.path.insert(0, os.getcwd())
 
+
 from config import REPRESENTATION_DIR, METRIC_DIR
 from metric_utils import (
     compute_prompt_entropy, compute_dataset_entropy,
@@ -50,15 +51,15 @@ def setup_logging():
 def parse_args():
     parser = argparse.ArgumentParser(description='Compute metrics for Base/SFT/DPO/RLVR/Instruct')
 
-    parser.add_argument('--models', type=str, nargs='+', default=['olmo2/7b'],
+    parser.add_argument('--models', type=str, nargs='+', default=['olmo2/1b', 'olmo2/7b'],
                         help='Model configs in format "family/scale"')
 
-    parser.add_argument('--dataset', type=str, default='mmlu',
+    parser.add_argument('--dataset', type=str, default='gsm8k',
                         help='Dataset name')
 
     # Variants to process
     parser.add_argument('--variants', type=str, nargs='+',
-                        default=['sft', 'dpo', 'rlvr', 'instruct'],
+                        default=['sft'],
                         choices=['sft', 'dpo', 'rlvr', 'instruct'],
                         help='Variants to compare against Base')
 
@@ -102,7 +103,7 @@ def get_cache_path(args):
     }
     config_str = json.dumps(config_dict, sort_keys=True)
     run_hash = hashlib.md5(config_str.encode()).hexdigest()[:12]
-    filename = f"cache_multivar_{args.dataset}_{run_hash}.pt"
+    filename = f"cache_{args.dataset}_{run_hash}.pt"
     return os.path.join(METRIC_DIR, filename)
 
 def load_single_file(path):
@@ -375,7 +376,7 @@ def visualize_results(results_store, output_dir):
 
             if has_data:
                 title = f"{metric_name} - {sub_key}" if sub_key else metric_name
-                plt.ylim(0.0, 1.0)
+                # plt.ylim(0.0, 1.0)
 
                 plt.title(title, fontsize=14)
                 plt.xlabel("Layer Depth", fontsize=12)
@@ -506,6 +507,70 @@ def main():
     viz_dir = os.path.join(METRIC_DIR, 'plots', args.dataset, timestamp)
     logger.info(f"📊 [Plot] Generating plots to {viz_dir}...")
     visualize_results(visualization_store, viz_dir)
+
+    # ======================================================
+    # 新增：生成合并的宽格式 CSV (One file per Model Scale)
+    # ======================================================
+    import pandas as pd
+
+    csv_output_dir = os.path.join(METRIC_DIR, 'csv_reports')
+    os.makedirs(csv_output_dir, exist_ok=True)
+
+    # 遍历每个指定的模型架构 (如 olmo2/1b)
+    for model_str in args.models:
+        family, scale = model_str.split('/')
+        # 构造匹配前缀，例如 "olmo2-1b"
+        prefix = f"{family}-{scale}"
+
+        # 准备一个字典来收集所有层的数据: layer_idx -> {col_name: value}
+        layer_data = defaultdict(dict)
+
+        # 遍历所有计算好的指标
+        for metric_name, models_data in visualization_store.items():
+            for model_key, values in models_data.items():
+                # 只处理属于当前架构的数据 (e.g. olmo2-1b-base, olmo2-1b-sft...)
+                if not model_key.startswith(prefix):
+                    continue
+
+                # 解析后缀作为列名区分 (base, sft, base-vs-sft)
+                # model_key: "olmo2-1b-base" -> suffix: "base"
+                suffix = model_key[len(prefix) + 1:]
+                col_name = f"{metric_name}_{suffix}"  # e.g., prompt_entropy_base
+
+                # 提取数值 (处理 list 或 dict 结构)
+                final_values = []
+                if isinstance(values, list):
+                    final_values = values
+                elif isinstance(values, dict):
+                    # 优先取 maxEntropy 或 raw
+                    for norm_key in ['maxEntropy', 'raw', 'normalized']:
+                        if norm_key in values:
+                            final_values = values[norm_key]
+                            break
+                    if not final_values and values:
+                        final_values = list(values.values())[0]
+
+                # 填入数据
+                for layer_idx, val in enumerate(final_values):
+                    layer_data[layer_idx][col_name] = val
+
+        # 转换为 DataFrame 并保存
+        if layer_data:
+            df = pd.DataFrame.from_dict(layer_data, orient='index')
+            df.index.name = 'layer'
+            df.sort_index(inplace=True)
+            df.reset_index(inplace=True)
+
+            # 生成文件名: metrics_olmo2-1b_FULL.csv
+            save_name = f"metrics_{prefix}_FULL.csv"
+            save_path = os.path.join(csv_output_dir, save_name)
+
+            df.to_csv(save_path, index=False)
+            logger.info(f"💾 [CSV] Saved MERGED metrics to: {save_path}")
+
+            # 打印前几列看看效果
+            # print(df.head())
+
     logger.info("🎉 [Done] All tasks completed.")
 
 if __name__ == "__main__":

@@ -63,52 +63,6 @@ MODEL_CONFIGS = {
             'num_layers': 64, # Estimated, verify with config.json
         },
     },
-    'gemma3': {
-        '1b': {
-            'base': 'google/gemma-3-1b-pt',
-            'instruct': 'google/gemma-3-1b-it',
-            'num_layers': 18,
-        },
-        '27b': {
-            'base': 'google/gemma-3-27b-pt',
-            'instruct': 'google/gemma-3-27b-it',
-            'num_layers': 46,
-        },
-    },
-    'qwen25': {
-        '7b': {
-            'base': 'Qwen/Qwen2.5-7B',
-            'instruct': 'Qwen/Qwen2.5-7B-Instruct',
-            'num_layers': 28,
-        },
-        '14b': {
-            'base': 'Qwen/Qwen2.5-14B',
-            'instruct': 'Qwen/Qwen2.5-14B-Instruct',
-            'num_layers': 48,
-        },
-        '32b': {
-            'base': 'Qwen/Qwen2.5-32B',
-            'instruct': 'Qwen/Qwen2.5-32B-Instruct',
-            'num_layers': 64,
-        },
-        '72b': {
-            'base': 'Qwen/Qwen2.5-72B',
-            'instruct': 'Qwen/Qwen2.5-72B-Instruct',
-            'num_layers': 80,
-        },
-    },
-    'llama32': {
-        '1b': {
-            'base': 'meta-llama/Llama-3.2-1B',
-            'instruct': 'meta-llama/Llama-3.2-1B-Instruct',
-            'num_layers': 16,
-        },
-        '3b': {
-            'base': 'meta-llama/Llama-3.2-3B',
-            'instruct': 'meta-llama/Llama-3.2-3B-Instruct',
-            'num_layers': 28,
-        },
-    },
 }
 # ============================================================================
 # Dataset Configurations
@@ -116,6 +70,7 @@ MODEL_CONFIGS = {
 MAX_LENGTH = 128
 N_POOLED = 200
 N_TOKEN = 50
+# ['mmlu', 'gsm8k', 'wikitext', 'ifeval', 'humaneval', 'mt_bench', 'toxigen']
 DATASET_CONFIGS = {
     # Token-level datasets: save both pooled (1000 samples) and token-level (100 samples)
     'mmlu': {
@@ -138,6 +93,16 @@ DATASET_CONFIGS = {
         'max_length': MAX_LENGTH,
         'format_type': 'qa',
     },
+    'gsm8kgradient': {
+            'hf_name': 'openai/gsm8k',
+            'subset': 'main',
+            'split': 'train',
+            'type': 'token-level',
+            'n_samples_pooled': N_POOLED,
+            'n_samples_token': N_TOKEN,
+            'max_length': MAX_LENGTH,
+            'format_type': 'qa',
+        },
     'wikitext': {
         'hf_name': 'Salesforce/wikitext',
         'subset': 'wikitext-103-v1',
@@ -191,10 +156,3 @@ DATASET_CONFIGS = {
         'format_type': 'text_classification',
     },
 }
-
-# ============================================================================
-# Default Parameters
-# ============================================================================
-# DEFAULT_BATCH_SIZE = 32
-# DEFAULT_SEED = 42
-# DEFAULT_DTYPE = 'float32'

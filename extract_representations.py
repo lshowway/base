@@ -52,7 +52,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Extract representations from language models')
 
     # Model Selection (Combined family/scale)
-    parser.add_argument('--models', type=str, nargs='+', default=['olmo2/32b'],
+    parser.add_argument('--models', type=str, nargs='+', default=['olmo2/1b'],
                         choices=['llama32/1b', 'llama32/3b', 'gemma3/1b', 'gemma3/27b', 'mistral/7b',
                                  'qwen25/7b', 'qwen25/14b', 'qwen25/32b', 'qwen25/72b',
                                  'olmo2/1b', 'olmo2/7b', 'olmo2/13b', 'olmo2/32b'],
@@ -60,12 +60,12 @@ def parse_args():
                         #          'olmo2/1b', 'olmo2/7b', 'olmo2/13b', 'olmo2/32b'],
                         help='Model configs in format "family/scale" (e.g. "llama32/1b" "qwen25/7b")')
 
-    parser.add_argument('--variant', type=str, nargs='+', default=['base', 'sft', 'dpo', 'rlvr', 'instruct'],
+    parser.add_argument('--variant', type=str, nargs='+', default=['base', 'sft'],
                         choices=['base', 'sft', 'dpo', 'rlvr', 'instruct'],  # <--- 这里增加了选项
                         help='Model variants to process for each model')
 
     # Dataset arguments
-    parser.add_argument('--dataset', type=str, nargs='+', default=['mmlu'],
+    parser.add_argument('--dataset', type=str, nargs='+', default=['gsm8k'],
                         help='Dataset names (e.g., mmlu gsm8k wikitext)')
 
     # Representation extraction arguments
