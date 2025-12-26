@@ -17,6 +17,7 @@ METRIC_DIR = os.path.join(OUTPUT_DIR, 'metrics')
 # ============================================================================
 # Model Configurations
 # ============================================================================
+# [mistral/7b, olmo2/1b, olmo2/7b, olmo2/13b, olmo2/32b]
 MODEL_CONFIGS = {
     'mistral': {
         '7b': {
@@ -76,27 +77,32 @@ DATASET_CONFIGS = {
     'mmlu': {
         'hf_name': 'cais/mmlu',
         'subset': 'all',
-        'split': 'test',
+        'split_test': 'test',
+        'split_train': 'auxiliary_train', # Training split
         'type': 'token-level',
         'n_samples_pooled': N_POOLED,  # Number of samples for pooled representations
         'n_samples_token': N_TOKEN,     # Number of samples for token-level representations
         'max_length': MAX_LENGTH,
         'format_type': 'multiple_choice',
+        'metric_mode': 'exact_match',
     },
     'gsm8k': {
         'hf_name': 'openai/gsm8k',
         'subset': 'main',
-        'split': 'test',
+        'split_test': 'test',
+        'split_train': 'train', # Training split
         'type': 'token-level',
         'n_samples_pooled': N_POOLED,
         'n_samples_token': N_TOKEN,
         'max_length': MAX_LENGTH,
         'format_type': 'qa',
+        'metric_mode': 'exact_match',
     },
     'gsm8kgradient': {
             'hf_name': 'openai/gsm8k',
             'subset': 'main',
-            'split': 'train',
+            'split_test': 'train',
+            'split_train': 'train',
             'type': 'token-level',
             'n_samples_pooled': N_POOLED,
             'n_samples_token': N_TOKEN,
@@ -106,53 +112,63 @@ DATASET_CONFIGS = {
     'wikitext': {
         'hf_name': 'Salesforce/wikitext',
         'subset': 'wikitext-103-v1',
-        'split': 'test',
+        'split_test': 'test',
+        'split_train': 'train',
         'type': 'token-level',
         'n_samples_pooled': N_POOLED,
         'n_samples_token': N_TOKEN,
         'max_length': MAX_LENGTH,
         'format_type': 'text',
+        'metric_mode': 'perplexity',
     },
     'ifeval': {
         'hf_name': 'google/IFEval',
         'subset': None,
-        'split': 'train',
+        'split_test': 'train',
+        'split_train': 'train',
         'type': 'token-level',
         'n_samples_pooled': N_POOLED,
         'n_samples_token': N_TOKEN,
         'max_length': MAX_LENGTH,
         'format_type': 'instruction',
+        'metric_mode': 'loss',
     },
 
     # Pooled-only datasets
     'humaneval': {
         'hf_name': 'openai_humaneval',
         'subset': None,
-        'split': 'test',
+        'split_test': 'test',
+        'split_train': 'train',
         'type': 'pooled',
         'n_samples_pooled': N_POOLED,
         'n_samples_token': 0,
         'max_length': MAX_LENGTH,
         'format_type': 'code',
+        'metric_mode': 'loss',
     },
     'mt_bench': {
         'hf_name': 'HuggingFaceH4/mt_bench_prompts',
         'subset': None,
-        'split': 'train',
+        'split_test': 'train',
+        'split_train': 'train',
         'type': 'pooled',
         'n_samples_pooled': N_POOLED,
         'n_samples_token': 0,
         'max_length': MAX_LENGTH,
         'format_type': 'conversation',
+        'metric_mode': 'loss',
     },
     'toxigen': {
         'hf_name': 'toxigen/toxigen-data',
         'subset': 'annotated',
-        'split': 'test',
+        'split_test': 'test',
+        'split_train': 'train',
         'type': 'pooled',
         'n_samples_pooled': N_POOLED,
         'n_samples_token': 0,
         'max_length': MAX_LENGTH,
         'format_type': 'text_classification',
+        'metric_mode': 'perplexity',
     },
 }
