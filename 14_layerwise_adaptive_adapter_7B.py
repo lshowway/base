@@ -4,12 +4,6 @@ E13: Segment-wise Adaptive Adapter (Transfer Learning & Depth Control)
 ** 支持断点续传 (Resume Capability) + 唯一化文件命名 **
 """
 import os
-
-# # ================= 强制离线模式 =================
-# # 告诉 HF 只能使用本地缓存，绝对禁止联网检查更新
-# os.environ["HF_HUB_OFFLINE"] = "1"
-# os.environ["TRANSFORMERS_OFFLINE"] = "1"
-# # ===============================================
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -67,10 +61,10 @@ def parse_args():
     parser = argparse.ArgumentParser(description='E13: Segment-wise Adaptive Adapter (DDP Fixed)')
 
     # Model
-    parser.add_argument('--model', type=str, default='olmo2/13b', help='Format: family/scale')
+    parser.add_argument('--model', type=str, default='olmo2/7b', help='Format: family/scale')
 
     # Data
-    parser.add_argument('--train_dataset', type=str, default='gsm8k',
+    parser.add_argument('--train_dataset', type=str, default='mmlu',
                         choices=list(DATASET_CONFIGS.keys()), help='Dataset used for SFT')
     parser.add_argument('--test_datasets', type=str, nargs='+',
                         default=['gsm8k', 'mmlu'],
@@ -79,15 +73,15 @@ def parse_args():
     # Strategy Params
     parser.add_argument('--adapter_configs', type=str, nargs='+',
                         default=[
-                            '64,64,64,64,64',  # 1. Baseline -> 2560
-                            '-1,320,-1,-1,-1',  # 5. 中间靠左 (Seg 2, 8L): 320*8=2560 (=Budget)
-                            '-1,106,106,106,-1',  # 3. 中间宽幅 (Seg 2-4, 24L): 106*24=2544 (<2560, 误差0.6%)
-                            '-1,-1,320,-1,-1',  # 2. 中间单峰 (Seg 3, 8L): 320*8=2560 (=Budget)
-                            '-1,160,160,-1,-1',  # 4. 中间靠左+ (Seg 2-3, 16L): 160*16=2560 (=Budget)
-                            # '-1,-1,160,160,-1',  # 6. 中间靠右+ (Seg 3-4, 16L): 160*16=2560 (=Budget)
-                            # '-1,-1,-1,320,-1',  # 7. 中间靠右 (Seg 4, 8L): 320*8=2560 (=Budget)
-                            # '-1,-1,-1,-1,320',  # 8. 高层强化 (Seg 5, 8L): 320*8=2560 (=Budget)
-                            # '320,-1,-1,-1,-1',  # 9. 低层强化 (Seg 1, 8L): 320*8=2560 (=Budget)
+                            '64,64,64,64,64',       # 1. Baseline -> 2048
+                            '-1,341,-1,-1,-1',  # 5. 中间靠左 (Seg 2, 6L): 341*6=2046 ≈ 2048
+                            '-1,-1,292,-1,-1',      # 2. 中间单峰 (Seg 3, 7L): 292*7=2044 ≈ 2048
+                            '-1,107,107,107,-1',    # 3. 中间宽幅 (Seg 2-4, 19L): 107*19=2033 ≈ 2048
+                            '-1,157,157,-1,-1',     # 4. 中间靠左+ (Seg 2-3, 13L): 157*13=2041 ≈ 2048
+                            '-1,-1,157,157,-1',     # 6. 中间靠右+ (Seg 3-4, 13L): 157*13=2041 ≈ 2048
+                            '-1,-1,-1,341,-1',      # 7. 中间靠右 (Seg 4, 6L): 341*6=2046 ≈ 2048
+                            '-1,-1,-1,-1,292',      # 8. 高层强化 (Seg 5, 7L): 292*7=2044 ≈ 2048
+                            '341,-1,-1,-1,-1',      # 9. 低层强化 (Seg 1, 6L): 341*6=2046 ≈ 2048
                         ],
                         help='List of comma-separated ranks.')
 
@@ -99,7 +93,7 @@ def parse_args():
 
     # Training Config
     parser.add_argument('--num_epochs', type=float, default=1.0)
-    parser.add_argument('--learning_rate', type=float, default=2e-4)
+    parser.add_argument('--learning_rate', type=float, default=1e-4)
     parser.add_argument('--train_batch_size', type=int, default=4,
                         help='Per-GPU batch size. Effective = this × num_gpus × grad_accum')
     parser.add_argument('--eval_batch_size', type=int, default=32)
@@ -107,7 +101,7 @@ def parse_args():
     # ================================================
 
     parser.add_argument('--n_train_samples', type=int, default=2000)
-    parser.add_argument('--n_test_samples', type=int, default=32)
+    parser.add_argument('--n_test_samples', type=int, default=100)
 
     parser.add_argument('--output_dir', type=str, default=os.path.join(OUTPUT_DIR, 'adaptive_adapter_viz'))
     parser.add_argument('--use_wandb', action='store_true')
@@ -341,15 +335,15 @@ def visualize_multi_dataset_results(results_df, output_dir, train_dataset, args,
     # 唯一化文件名参数
     model_safe_name = args.model.replace("/", "-")
 
-    # # 1. Bar Chart
-    # plt.figure(figsize=(10, 6), dpi=300)
+    # 1. Bar Chart
+    # plt.figure(figsize=(8, 6), dpi=300)
     # sns.barplot(data=results_df, x='TestDataset', y='Score', hue='Strategy', palette='viridis')
     # plt.title(f"Transfer Learning: {model_safe_name} trained on {train_dataset}")
     # plt.ylabel("Score (Acc or Low PPL)")
     # plt.grid(axis='y', alpha=0.3)
     # plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     # plt.tight_layout()
-    # plt.savefig(os.path.join(output_dir, f'lora_adapter_{model_safe_name}_r{rank}.png'))
+    # plt.savefig(os.path.join(output_dir, f'transfer_performance_{model_safe_name}_r{rank}.png'))
     # plt.show()
     # plt.close()
 
@@ -403,6 +397,7 @@ def main():
     base_rank = max(first_rank_config)  # 假设第一个配置通常包含基准rank
 
     model_safe_name = args.model.replace("/", "-")
+    # csv_filename = f'lora_{model_safe_name}_{args.train_dataset}_rank{base_rank}_lr{args.learning_rate}_target.csv'
     csv_filename = f'lora_{model_safe_name}_{args.train_dataset}_rank{base_rank}_lr{args.learning_rate}.csv'
     csv_path = os.path.join(args.output_dir, csv_filename)
 
@@ -504,6 +499,7 @@ def main():
                     lora_alpha=args.lora_alpha,
                     lora_dropout=args.lora_dropout,
                     target_modules=["q_proj", "v_proj", "k_proj", "o_proj"],
+                    # target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
                     bias="none",
                     layers_to_transform=active_layers
                 )

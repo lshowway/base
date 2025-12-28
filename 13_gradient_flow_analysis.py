@@ -1,5 +1,5 @@
 """
-11_gradient_flow_analysis.py
+13_gradient_flow_analysis.py
 E5: Gradient Flow Analysis - 梯度流与表征变化关联分析
 
 Fixed:
@@ -417,7 +417,7 @@ def main():
                 # 自动推断 metrics 文件路径
                 metrics_file = args.representation_metrics_file
                 if metrics_file is None:
-                    # 默认寻找 Base 模型的静态指标 (格式对齐 compute_and_visualize_metrics.py)
+                    # 默认寻找 Base 模型的静态指标 (格式对齐 01_compute_and_visualize_metrics.py)
                     auto_filename = f"metrics_{family}-{scale}_FULL.csv"
                     auto_path = os.path.join(METRIC_DIR, 'csv_reports', auto_filename)
 

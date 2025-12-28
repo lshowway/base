@@ -1,15 +1,3 @@
-"""
-Compute and Visualize Metrics (Multi-Variant & Memory Safe & Colorful)
-
-Supports: Base, SFT, DPO, RLVR, Instruct
-Logic:
-1. Load Base (Keep in Memory)
-2. Loop over [SFT, DPO, RLVR, Instruct]:
-   - Load Variant
-   - Compute Variant Metrics
-   - Compute Alignment (Base vs Variant)
-   - Unload Variant (GC)
-"""
 import os
 import argparse
 import logging
@@ -19,6 +7,7 @@ import json
 import gc
 import matplotlib.pyplot as plt
 import seaborn as sns
+import pandas as pd
 from tqdm import tqdm
 from glob import glob
 from collections import defaultdict
@@ -27,7 +16,6 @@ from datetime import datetime
 
 import sys
 sys.path.insert(0, os.getcwd())
-
 
 from config import REPRESENTATION_DIR, METRIC_DIR
 from metric_utils import (
@@ -38,26 +26,27 @@ from metric_utils import (
 )
 
 plt.style.use('seaborn-v0_8-paper')
-sns.set_palette("tab10")
+# sns.set_palette("tab10") # 将在画图函数中动态设置
 
 def setup_logging():
     os.makedirs(METRIC_DIR, exist_ok=True)
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(message)s' # Simplified format
+        format='%(asctime)s - %(message)s'
     )
     return logging.getLogger(__name__)
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Compute metrics for Base/SFT/DPO/RLVR/Instruct')
 
-    parser.add_argument('--models', type=str, nargs='+', default=['olmo2/1b', 'olmo2/7b'],
+    parser.add_argument('--models', type=str, nargs='+',
+                        default=['olmo2/7b', 'olmo2/13b', 'olmo2/32b'],
+                        choices=['mistral/7b', 'olmo2/1b', 'olmo2/7b', 'olmo2/13b', 'olmo2/32b'],
                         help='Model configs in format "family/scale"')
-
-    parser.add_argument('--dataset', type=str, default='gsm8k',
+    parser.add_argument('--dataset', type=str, default='toxigen',
+                        choices=['mmlu', 'gsm8k', 'wikitext', 'ifeval', 'humaneval', 'mt_bench', 'toxigen'],
                         help='Dataset name')
 
-    # Variants to process
     parser.add_argument('--variants', type=str, nargs='+',
                         default=['sft'],
                         choices=['sft', 'dpo', 'rlvr', 'instruct'],
@@ -74,7 +63,6 @@ def parse_args():
                         default=['maxEntropy'],
                         help='Normalization schemes for entropy metrics')
 
-    # Memory Control
     parser.add_argument('--batch_size', type=int, default=10,
                         help='Number of files to load per batch for streaming')
     parser.add_argument('--max_samples', type=int, default=1000,
@@ -91,11 +79,14 @@ def parse_args():
     args.models = sorted(args.models)
     return args
 
-def get_cache_path(args):
-    """Generate deterministic cache filename"""
+# ============================================================================
+# NEW: Model-Specific Cache Logic
+# ============================================================================
+def get_model_specific_cache_path(args, model_str):
+    """Generate deterministic cache filename specific to ONE model"""
     config_dict = {
         'dataset': args.dataset,
-        'models': args.models,
+        'model': model_str, # Use specific model, NOT args.models list
         'variants': args.variants,
         'metrics': args.metrics,
         'normalization': args.normalization,
@@ -103,7 +94,10 @@ def get_cache_path(args):
     }
     config_str = json.dumps(config_dict, sort_keys=True)
     run_hash = hashlib.md5(config_str.encode()).hexdigest()[:12]
-    filename = f"cache_{args.dataset}_{run_hash}.pt"
+
+    # Filename includes model name for clarity
+    safe_model_name = model_str.replace('/', '_')
+    filename = f"cache_{args.dataset}_{safe_model_name}.pt"
     return os.path.join(METRIC_DIR, filename)
 
 def load_single_file(path):
@@ -114,44 +108,30 @@ def load_single_file(path):
         return None
 
 # ============================================================================
-# Streaming & Safe Computation Functions
+# Computation Functions (Unchanged logic, just wrappers)
 # ============================================================================
 
-def compute_sequence_metrics_streaming(
-    model_family, scale, variant, dataset,
-    metrics_list, normalizations, device,
-    base_dir=REPRESENTATION_DIR,
-    batch_size=10
-):
-    """Streaming computation for Hidden States (Entropy, Curvature)"""
+def compute_sequence_metrics_streaming(model_family, scale, variant, dataset, metrics_list, normalizations, device, base_dir=REPRESENTATION_DIR, batch_size=10):
+    # ... (Same as before, abridged for brevity) ...
     needed_metrics = set(['prompt_entropy', 'curvature', 'sparsity']) & set(metrics_list)
-    if not needed_metrics:
-        return {}
+    if not needed_metrics: return {}
 
     logging.info(f"    🌊 [Stream] Computing sequence metrics ({variant})...")
     data_dir = os.path.join(base_dir, model_family, f"{scale}_{variant}", dataset)
     files = sorted(glob(os.path.join(data_dir, "*.pt")))
+    if not files: return {}
 
-    if not files:
-        logging.warning(f"    ⚠️ No files found for {variant} in {data_dir}")
-        return {}
-
-    # Use 3-layer dict to prevent IndexError
     results_agg = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-
     num_batches = (len(files) + batch_size - 1) // batch_size
 
     for batch_idx in tqdm(range(num_batches), desc=f"    🌊 Processing {variant}", leave=False):
-        start_idx = batch_idx * batch_size
-        end_idx = min(start_idx + batch_size, len(files))
-        batch_files = files[start_idx:end_idx]
-
-        batch_hidden = defaultdict(list)
-        has_hidden = False
+        batch_files = files[batch_idx * batch_size : (batch_idx + 1) * batch_size]
 
         with ThreadPoolExecutor(max_workers=4) as executor:
             loaded_samples = list(executor.map(load_single_file, batch_files))
 
+        batch_hidden = defaultdict(list)
+        has_hidden = False
         for s in loaded_samples:
             if s and s.get('hidden_states'):
                 has_hidden = True
@@ -163,10 +143,10 @@ def compute_sequence_metrics_streaming(
         hidden_batch_stacked = {}
         for k, v in batch_hidden.items():
             try:
-                tensor = torch.stack(v).float()
-                if device == 'cuda': tensor = tensor.to(device)
-                hidden_batch_stacked[k] = tensor
-            except Exception: pass
+                t = torch.stack(v).float()
+                if device == 'cuda': t = t.to(device)
+                hidden_batch_stacked[k] = t
+            except: pass
 
         batch_results = {}
         if 'prompt_entropy' in needed_metrics:
@@ -176,7 +156,6 @@ def compute_sequence_metrics_streaming(
         if 'sparsity' in needed_metrics:
             batch_results['sparsity'] = compute_sparsity(hidden_batch_stacked)
 
-        # Aggregate
         for metric, layers_data in batch_results.items():
             if isinstance(layers_data, dict):
                 for sub_key, vals in layers_data.items():
@@ -189,7 +168,6 @@ def compute_sequence_metrics_streaming(
         del hidden_batch_stacked, batch_hidden, loaded_samples
         if device == 'cuda': torch.cuda.empty_cache()
 
-    # Final Reduction
     final_results = {}
     for metric, sub_dict in results_agg.items():
         final_results[metric] = {}
@@ -199,42 +177,28 @@ def compute_sequence_metrics_streaming(
             averaged_vals = []
             max_layer = max(sorted_layers)
             for i in range(max_layer + 1):
-                if i in layers_dict:
-                    vals = layers_dict[i]
-                    averaged_vals.append(sum(vals) / len(vals))
-                else:
-                    averaged_vals.append(0.0)
+                vals = layers_dict.get(i, [])
+                averaged_vals.append(sum(vals) / len(vals) if vals else 0.0)
             final_results[metric][sub_key] = averaged_vals
-
     return final_results
 
-def load_pooled_subset(
-    model_family, scale, variant, dataset,
-    max_samples=5000,
-    base_dir=REPRESENTATION_DIR,
-    batch_size=50
-):
-    """Load subset of pooled states to CPU"""
+def load_pooled_subset(model_family, scale, variant, dataset, max_samples, base_dir=REPRESENTATION_DIR, batch_size=50):
     logging.info(f"    📥 [Load] Loading pooled subset ({variant}, max={max_samples})...")
     data_dir = os.path.join(base_dir, model_family, f"{scale}_{variant}", dataset)
     files = sorted(glob(os.path.join(data_dir, "*.pt")))
-
     if not files: return None
 
-    # Deterministic shuffle
     import random
     random.seed(42)
     random.shuffle(files)
 
     pooled_agg = defaultdict(list)
     current_count = 0
-
     for i in range(0, len(files), batch_size):
         if current_count >= max_samples: break
         batch_files = files[i : i+batch_size]
         with ThreadPoolExecutor(max_workers=4) as executor:
             samples = list(executor.map(load_single_file, batch_files))
-
         for s in samples:
             if not s: continue
             if current_count >= max_samples: break
@@ -245,17 +209,13 @@ def load_pooled_subset(
     final_pooled = {}
     for k, v in pooled_agg.items():
         final_pooled[k] = torch.stack(v)
-
-    logging.info(f"    ✅ [Load] Loaded {current_count} pooled samples for {variant}")
     return final_pooled
 
 def compute_pooled_metrics_in_memory(pooled_states, metrics_list, normalizations, device):
-    """Compute global metrics (Entropy, Rank, Norm)"""
     results = {}
     needed = set(['dataset_entropy', 'effective_rank', 'l2_norm', 'spectral_metrics']) & set(metrics_list)
     if not pooled_states or not needed: return results
 
-    logging.info(f"    🧠 [Compute] Global metrics (Size: {len(pooled_states)} layers)...")
     use_gpu = (device == 'cuda' and torch.cuda.is_available())
 
     if 'dataset_entropy' in metrics_list:
@@ -269,10 +229,7 @@ def compute_pooled_metrics_in_memory(pooled_states, metrics_list, normalizations
             if use_gpu: del tensor; torch.cuda.empty_cache()
         results['dataset_entropy'] = res
 
-    # Generic loop for others
-    for metric, func in [('effective_rank', compute_effective_rank),
-                         ('l2_norm', compute_l2_norm),
-                         ('spectral_metrics', compute_spectral_metrics)]:
+    for metric, func in [('effective_rank', compute_effective_rank), ('l2_norm', compute_l2_norm), ('spectral_metrics', compute_spectral_metrics)]:
         if metric in metrics_list:
             metrics_out = defaultdict(list)
             for layer in sorted(pooled_states.keys()):
@@ -284,31 +241,25 @@ def compute_pooled_metrics_in_memory(pooled_states, metrics_list, normalizations
                 elif isinstance(val, list):
                     metrics_out['raw'].append(val[0])
                 if use_gpu: del tensor; torch.cuda.empty_cache()
-
             if isinstance(val, dict): results[metric] = dict(metrics_out)
-            else: results[metric] = metrics_out['raw'] if 'raw' in metrics_out else []
-
+            else: results[metric] = metrics_out.get('raw', [])
     return results
 
 def compute_alignment_metrics_safe(base_pooled, target_pooled, metrics_list, device):
-    """Compute alignment between Base and Target"""
     results = {}
     needed = set(['cka', 'cosine_similarity', 'mean_shift']) & set(metrics_list)
     if not base_pooled or not target_pooled or not needed: return results
 
-    logging.info(f"    📐 [Align] Computing Alignment Metrics...")
     common_layers = sorted(list(set(base_pooled.keys()) & set(target_pooled.keys())))
+    if not common_layers: return results
     min_len = min(base_pooled[common_layers[0]].shape[0], target_pooled[common_layers[0]].shape[0])
-
     use_gpu = (device == 'cuda' and torch.cuda.is_available())
 
     if 'cka' in metrics_list:
         res = []
         for l in common_layers:
-            b = base_pooled[l][:min_len]
-            t = target_pooled[l][:min_len]
-            if use_gpu:
-                b, t = b.to(device), t.to(device)
+            b, t = base_pooled[l][:min_len], target_pooled[l][:min_len]
+            if use_gpu: b, t = b.to(device), t.to(device)
             res.append(compute_cka({l: b}, {l: t})[0])
             if use_gpu: del b, t; torch.cuda.empty_cache()
         results['cka'] = res
@@ -332,16 +283,43 @@ def compute_alignment_metrics_safe(base_pooled, target_pooled, metrics_list, dev
     return results
 
 # ============================================================================
-# Main Loop & Visualization
+# NEW: Improved Visualization
 # ============================================================================
 
 def visualize_results(results_store, output_dir):
     os.makedirs(output_dir, exist_ok=True)
 
+    # 1. 预先计算颜色映射，确保同一模型架构(Family-Scale)颜色一致
+    all_keys = set()
+    for m_data in results_store.values():
+        all_keys.update(m_data.keys())
+
+    # 提取唯一前缀 (例如: olmo2-1b, mistral-7b)
+    # 假设 key 格式为: family-scale-variant
+    unique_prefixes = sorted(list(set(["-".join(k.split('-')[:2]) for k in all_keys])))
+
+    # 使用 tab10 调色板
+    palette = sns.color_palette("tab10", n_colors=len(unique_prefixes))
+    color_map = {prefix: palette[i] for i, prefix in enumerate(unique_prefixes)}
+
+    def format_legend_label(label):
+        """将 olmo2-1b-base 转换为 OLMo2-1B-Base"""
+        parts = label.split('-')
+        new_parts = []
+        for p in parts:
+            if p.lower() == 'olmo2': new_parts.append('OLMo2')
+            elif p.lower() == 'mistral': new_parts.append('Mistral')
+            elif p.lower() == 'sft': new_parts.append('SFT')
+            elif p.lower() == 'base': new_parts.append('Base')
+            elif p.lower() == 'vs': new_parts.append('vs')
+            elif p.endswith('b') and p[:-1].isdigit(): new_parts.append(p.upper()) # 1b -> 1B
+            else: new_parts.append(p.capitalize())
+        return "-".join(new_parts)
+
     for metric_name, model_data in results_store.items():
         if not model_data: continue
 
-        # Check sub-keys (normalization etc.)
+        # 检查子键 (normalization 等)
         first_val = next(iter(model_data.values()))
         if isinstance(first_val, dict):
             sub_keys = sorted(list(first_val.keys()))
@@ -349,47 +327,81 @@ def visualize_results(results_store, output_dir):
             sub_keys = [None]
 
         for sub_key in sub_keys:
-            plt.figure(figsize=(6, 4), dpi=300)
+            # 修改 1: figsize 调大
+            plt.figure(figsize=(8, 6), dpi=800)
             has_data = False
 
-            # Sort keys to make legend orderly (Base first, then variants)
+            # 对 keys 排序，确保图例顺序一致
             sorted_keys = sorted(model_data.keys())
 
-            for model_label, values in model_data.items():
+            for model_label in sorted_keys:
+                values = model_data[model_label]
                 y_vals = values[sub_key] if sub_key else values
                 if not y_vals: continue
 
-                # Style logic
-                style = '-'
-                alpha = 0.8
-                width = 2
+                # 获取颜色 (基于 family-scale)
+                parts = model_label.split('-')
+                prefix = f"{parts[0]}-{parts[1]}"
+                color = color_map.get(prefix, 'black')
 
+                # 修改 2: 样式逻辑 (Base虚线星号, 其他实线圆点)
                 if 'base' in model_label and 'vs' not in model_label:
-                    style = '--' # Base dashed
-                    width = 2.5
-                elif 'vs' in model_label:
-                    width = 2 # Alignment lines
+                    style = '--'
+                    marker = 'o'
+                    # Base 透明度稍高一点点，或者保持不透明
+                    alpha = 0.7
+                else:
+                    style = '-'
+                    marker = '*'
+                    alpha = 0.9
 
-                x_vals = range(len(y_vals))
-                plt.plot(x_vals, y_vals, linestyle=style, linewidth=width, marker='o', markersize=6, label=model_label, alpha=alpha)
+                # 修改 3: 线宽和点大小
+                x_vals = range(1, len(y_vals))
+                label_str = format_legend_label(model_label)
+
+                plt.plot(x_vals, y_vals[1:],
+                         linestyle=style,
+                         linewidth=4,
+                         marker=marker,
+                         markersize=8,
+                         color=color,
+                         label=label_str,
+                         alpha=alpha)
                 has_data = True
 
             if has_data:
-                title = f"{metric_name} - {sub_key}" if sub_key else metric_name
-                # plt.ylim(0.0, 1.0)
+                # 修改 4: 移除 Title, Y轴显示 Metric Name, 字体变大；自定义 Y 轴标签格式化逻辑
+                if metric_name.lower() == 'cka':
+                    clean_metric_name = "CKA"
+                elif metric_name == 'spectral_metrics' and sub_key:
+                    # 对于谱分析，直接显示子项名称 (如 Condition Number, Rank Deficiency)
+                    clean_metric_name = sub_key.replace("_", " ").title()
+                else:
+                    # 对于 Entropy, Effective Rank 等，忽略 sub_key，只显示主指标名
+                    clean_metric_name = metric_name.replace("_", " ").title()
 
-                plt.title(title, fontsize=14)
-                plt.xlabel("Layer Depth", fontsize=12)
-                plt.ylabel("Value", fontsize=12)
-                plt.legend(loc='upper center', ncol=2) # Legend outside
+                plt.xlabel("Layer Depth", fontsize=18)
+                plt.ylabel(clean_metric_name, fontsize=18)
+
+                plt.xticks(fontsize=16)
+                plt.yticks(fontsize=16)
+
+                plt.legend(fontsize=18, loc='best')
                 plt.grid(True, linestyle='--', alpha=0.3)
                 plt.tight_layout()
 
-                clean_name = title.replace("/", "_").replace(" ", "_")
-                plt.savefig(os.path.join(output_dir, f"{clean_name}.png"), dpi=300)
-                logging.info(f"    📸 [Plot] Saved: {clean_name}.png")
+                clean_name = f"{metric_name}_{sub_key}" if sub_key else metric_name
+                clean_name = clean_name.replace("/", "_").replace(" ", "_")
+
+                save_path = os.path.join(output_dir, f"{clean_name}.pdf")
+                plt.savefig(save_path, dpi=800)
+                logging.info(f"    📸 [Plot] Saved: {clean_name}.pdf")
                 plt.show()
                 plt.close()
+
+# ============================================================================
+# Main Loop (Updated for Split Caching)
+# ============================================================================
 
 def main():
     args = parse_args()
@@ -399,150 +411,113 @@ def main():
     logger.info(f"🚀 [Start] Metric Computation")
     logger.info(f"📍 Models: {args.models}")
     logger.info(f"🎨 Variants: {args.variants}")
-    logger.info(f"💾 Max Samples: {args.max_samples}")
     logger.info("=" * 20)
 
-    cache_path = get_cache_path(args)
-    visualization_store = defaultdict(dict)
+    # 这里的 visualization_store 用于收集所有模型的数据，用于最后统一画图
+    global_visualization_store = defaultdict(dict)
 
-    if os.path.exists(cache_path) and not args.force_recompute:
-        logger.info(f"✨ [Cache] Loading found cache: {cache_path}")
-        visualization_store = torch.load(cache_path)
-    else:
-        for model_str in args.models:
-            family, scale = model_str.split('/')
-            logger.info(f"{'='*40}📦 [Model] Processing {family}/{scale}{'='*40}")
+    for model_str in args.models:
+        family, scale = model_str.split('/')
+        logger.info(f"{'='*40}📦 [Model] Processing {family}/{scale}{'='*40}")
 
-            # ------------------------------------------------------------
-            # 1. 加载和计算 BASE (常驻内存)
-            # ------------------------------------------------------------
+        # 1. 检查是否存在该模型的独立缓存
+        model_cache_path = get_model_specific_cache_path(args, model_str)
+        model_results = None
+
+        if os.path.exists(model_cache_path) and not args.force_recompute:
+            logger.info(f"✨ [Cache] Loading found cache for {model_str}: {model_cache_path}")
+            model_results = torch.load(model_cache_path)
+
+        # 2. 如果没有缓存，开始计算
+        if model_results is None:
+            model_results = defaultdict(dict) # Store results for THIS model only
+
+            # --- 2.1 BASE Model ---
             logger.info("  🛡️ [1/3] Processing BASE (Reference)...")
-
-            # A. Base Sequence Metrics
-            base_seq_metrics = compute_sequence_metrics_streaming(
-                family, scale, 'base', args.dataset,
-                args.metrics, args.normalization, args.device,
-                batch_size=args.batch_size
+            base_seq = compute_sequence_metrics_streaming(
+                family, scale, 'base', args.dataset, args.metrics, args.normalization, args.device, batch_size=args.batch_size
             )
-            for m, vals in base_seq_metrics.items():
-                visualization_store[m][f"{family}-{scale}-base"] = vals
+            for m, vals in base_seq.items():
+                model_results[m][f"{family}-{scale}-base"] = vals
 
-            # B. Base Pooled Data (Load into RAM)
             base_pooled = load_pooled_subset(
-                family, scale, 'base', args.dataset,
-                max_samples=args.max_samples,
-                batch_size=args.batch_size
+                family, scale, 'base', args.dataset, max_samples=args.max_samples, batch_size=args.batch_size
             )
 
             if base_pooled:
-                # C. Base Global Metrics
-                base_global_metrics = compute_pooled_metrics_in_memory(
-                    base_pooled, args.metrics, args.normalization, args.device
-                )
-                for m, vals in base_global_metrics.items():
-                    visualization_store[m][f"{family}-{scale}-base"] = vals
+                base_global = compute_pooled_metrics_in_memory(base_pooled, args.metrics, args.normalization, args.device)
+                for m, vals in base_global.items():
+                    model_results[m][f"{family}-{scale}-base"] = vals
             else:
-                logger.warning("    ⚠️ Base model data missing! Skipping alignment metrics.")
+                logger.warning("    ⚠️ Base model data missing!")
 
-            # ------------------------------------------------------------
-            # 2. 循环处理其他 Variants (SFT, DPO, RLVR, Instruct)
-            # ------------------------------------------------------------
+            # --- 2.2 Variants ---
             for var in args.variants:
                 logger.info(f"🎨 [2/3] Processing Variant: {var}...")
 
-                # A. Variant Sequence Metrics (Streaming)
-                var_seq_metrics = compute_sequence_metrics_streaming(
-                    family, scale, var, args.dataset,
-                    args.metrics, args.normalization, args.device,
-                    batch_size=args.batch_size
+                var_seq = compute_sequence_metrics_streaming(
+                    family, scale, var, args.dataset, args.metrics, args.normalization, args.device, batch_size=args.batch_size
                 )
-                if var_seq_metrics:
-                    for m, vals in var_seq_metrics.items():
-                        visualization_store[m][f"{family}-{scale}-{var}"] = vals
-                else:
-                    logger.warning(f"    ⚠️ Skipping {var} sequence metrics (no data)")
+                for m, vals in var_seq.items():
+                    model_results[m][f"{family}-{scale}-{var}"] = vals
 
-                # B. Variant Pooled Data (Load -> Compare -> Unload)
                 var_pooled = load_pooled_subset(
-                    family, scale, var, args.dataset,
-                    max_samples=args.max_samples,
-                    batch_size=args.batch_size
+                    family, scale, var, args.dataset, max_samples=args.max_samples, batch_size=args.batch_size
                 )
 
                 if var_pooled:
-                    # C. Variant Global Metrics
-                    var_global_metrics = compute_pooled_metrics_in_memory(
-                        var_pooled, args.metrics, args.normalization, args.device
-                    )
-                    for m, vals in var_global_metrics.items():
-                        visualization_store[m][f"{family}-{scale}-{var}"] = vals
+                    var_global = compute_pooled_metrics_in_memory(var_pooled, args.metrics, args.normalization, args.device)
+                    for m, vals in var_global.items():
+                        model_results[m][f"{family}-{scale}-{var}"] = vals
 
-                    # D. Alignment Metrics (Base vs Variant)
                     if base_pooled:
                         logger.info(f"    📐 [Align] Computing Alignment: Base vs {var}")
-                        align_metrics = compute_alignment_metrics_safe(
-                            base_pooled, var_pooled, args.metrics, args.device
-                        )
-                        for m, vals in align_metrics.items():
-                            # Key naming: family-scale-base-vs-sft
-                            visualization_store[m][f"{family}-{scale}-base-vs-{var}"] = vals
+                        align = compute_alignment_metrics_safe(base_pooled, var_pooled, args.metrics, args.device)
+                        for m, vals in align.items():
+                            model_results[m][f"{family}-{scale}"] = vals
 
-                # Clean up Variant data to prevent OOM
-                del var_pooled
-                gc.collect()
+                del var_pooled; gc.collect()
                 if args.device == 'cuda': torch.cuda.empty_cache()
 
-            # Clean up Base data after all variants are done
-            logger.info("  🧹 [Clean] Unloading Base model data...")
-            del base_pooled
-            gc.collect()
+            del base_pooled; gc.collect()
             if args.device == 'cuda': torch.cuda.empty_cache()
 
-        # Save Cache
-        logger.info(f"💾 [Save] Saving cache to {cache_path}")
-        torch.save(dict(visualization_store), cache_path)
+            # --- 2.3 保存该模型的缓存 ---
+            logger.info(f"💾 [Save] Saving cache for {model_str} to {model_cache_path}")
+            os.makedirs(os.path.dirname(model_cache_path), exist_ok=True)  # 强制创建父目录，防止报错
+            torch.save(dict(model_results), model_cache_path)
 
-    # Visualize
+        # 3. 将该模型的结果合并到全局 Store
+        for metric, m_dict in model_results.items():
+            global_visualization_store[metric].update(m_dict)
+
+    # 4. 可视化 (使用合并后的数据)
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    viz_dir = os.path.join(METRIC_DIR, 'plots', args.dataset, timestamp)
+    # viz_dir = os.path.join(METRIC_DIR, 'plots', args.dataset, timestamp)
+    viz_dir = os.path.join(METRIC_DIR, 'plots', args.dataset)
     logger.info(f"📊 [Plot] Generating plots to {viz_dir}...")
-    visualize_results(visualization_store, viz_dir)
+    visualize_results(global_visualization_store, viz_dir)
 
-    # ======================================================
-    # 新增：生成合并的宽格式 CSV (One file per Model Scale)
-    # ======================================================
-    import pandas as pd
-
+    # 5. CSV Output (Consolidated)
     csv_output_dir = os.path.join(METRIC_DIR, 'csv_reports')
     os.makedirs(csv_output_dir, exist_ok=True)
 
-    # 遍历每个指定的模型架构 (如 olmo2/1b)
+    # Generate CSV per model scale
     for model_str in args.models:
         family, scale = model_str.split('/')
-        # 构造匹配前缀，例如 "olmo2-1b"
         prefix = f"{family}-{scale}"
-
-        # 准备一个字典来收集所有层的数据: layer_idx -> {col_name: value}
         layer_data = defaultdict(dict)
 
-        # 遍历所有计算好的指标
-        for metric_name, models_data in visualization_store.items():
+        for metric_name, models_data in global_visualization_store.items():
             for model_key, values in models_data.items():
-                # 只处理属于当前架构的数据 (e.g. olmo2-1b-base, olmo2-1b-sft...)
-                if not model_key.startswith(prefix):
-                    continue
-
-                # 解析后缀作为列名区分 (base, sft, base-vs-sft)
-                # model_key: "olmo2-1b-base" -> suffix: "base"
+                if not model_key.startswith(prefix): continue
                 suffix = model_key[len(prefix) + 1:]
-                col_name = f"{metric_name}_{suffix}"  # e.g., prompt_entropy_base
+                col_name = f"{metric_name}_{suffix}"
 
-                # 提取数值 (处理 list 或 dict 结构)
                 final_values = []
-                if isinstance(values, list):
-                    final_values = values
+                if isinstance(values, list): final_values = values
                 elif isinstance(values, dict):
-                    # 优先取 maxEntropy 或 raw
+                    # Prefer maxEntropy or raw
                     for norm_key in ['maxEntropy', 'raw', 'normalized']:
                         if norm_key in values:
                             final_values = values[norm_key]
@@ -550,26 +525,17 @@ def main():
                     if not final_values and values:
                         final_values = list(values.values())[0]
 
-                # 填入数据
                 for layer_idx, val in enumerate(final_values):
                     layer_data[layer_idx][col_name] = val
 
-        # 转换为 DataFrame 并保存
         if layer_data:
             df = pd.DataFrame.from_dict(layer_data, orient='index')
             df.index.name = 'layer'
             df.sort_index(inplace=True)
             df.reset_index(inplace=True)
-
-            # 生成文件名: metrics_olmo2-1b_FULL.csv
             save_name = f"metrics_{prefix}_FULL.csv"
-            save_path = os.path.join(csv_output_dir, save_name)
-
-            df.to_csv(save_path, index=False)
-            logger.info(f"💾 [CSV] Saved MERGED metrics to: {save_path}")
-
-            # 打印前几列看看效果
-            # print(df.head())
+            df.to_csv(os.path.join(csv_output_dir, save_name), index=False)
+            logger.info(f"💾 [CSV] Saved metrics to: {save_name}")
 
     logger.info("🎉 [Done] All tasks completed.")
 

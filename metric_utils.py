@@ -30,6 +30,7 @@ ALIGNMENT_METRICS = ['cka', 'cosine_similarity', 'mean_shift', 'change_intensity
 # Metrics that require sequence dimension (N, T, D)
 SEQUENCE_METRICS = ['prompt_entropy', 'curvature', 'sparsity']
 
+# [prompt entropy, dataset entropy, effective rank, curvature, cka, cosine similarity, mean shift, sparsity, L2 norm, condition number, rank deficiency, spectral norm]
 
 # ============================================================================
 # Core Matrix Entropy
