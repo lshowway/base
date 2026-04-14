@@ -379,34 +379,28 @@ def compute_effective_rank(pooled_states: Dict[int, torch.Tensor]) -> Dict[str, 
     return results
 
 def compute_l2_norm(pooled_states: Dict[int, torch.Tensor]) -> Dict[str, List[float]]:
-    results = {'mean': [], 'std': []} # 补回 std
+    results = {'mean': [], 'std': []} 
     for layer_idx in sorted(pooled_states.keys()):
         norms = torch.norm(pooled_states[layer_idx].float(), dim=1)
         results['mean'].append(torch.mean(norms).item())
-        results['std'].append(torch.std(norms).item()) # 补回计算
+        results['std'].append(torch.std(norms).item()) 
     return results
 
 
 def compute_spectral_metrics(pooled_states: Dict[int, torch.Tensor]) -> Dict[str, List[float]]:
-    # 1. 补回 'rank_deficiency' key
     results = {'spectral_norm': [], 'condition_number': [], 'rank_deficiency': []}
 
     for layer_idx in sorted(pooled_states.keys()):
         hidden = pooled_states[layer_idx]
         N, D = hidden.shape
         try:
-            # 确保转为 float32 防止半精度溢出
             s_vals = torch.linalg.svdvals(hidden.float())
             s_max = s_vals[0].item()
             s_min = s_vals[-1].item()
             cond = s_max / (s_min + 1e-9)
 
-            # 2. 补回 Rank Deficiency 计算逻辑
-            # 计算有效秩：大于阈值(最大奇异值的1%)的数量
             thresh = 0.01 * s_max
             effective_rank = torch.sum(s_vals > thresh).item()
-            # 归一化秩缺失度：1 - (有效秩 / 理论最大秩)
-            # 值越高，说明维度崩塌越严重
             rank_def = 1.0 - (effective_rank / min(N, D))
 
         except Exception:
@@ -414,7 +408,7 @@ def compute_spectral_metrics(pooled_states: Dict[int, torch.Tensor]) -> Dict[str
 
         results['spectral_norm'].append(s_max)
         results['condition_number'].append(cond)
-        results['rank_deficiency'].append(rank_def)  # 3. 添加结果
+        results['rank_deficiency'].append(rank_def)  
 
     return results
 
