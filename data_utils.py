@@ -16,15 +16,12 @@ logger = logging.getLogger(__name__)
 def download_dataset(dataset_name: str, cache_dir: str = DATASET_CACHE_DIR) -> Dataset:
     config = DATASET_CONFIGS[dataset_name]
 
-    # 构建本地保存路径
     local_path = os.path.join(cache_dir,  dataset_name)
 
-    # 如果本地已存在，直接加载
     if os.path.exists(local_path):
         logger.info(f" ✅ Loading {dataset_name} from local disk: {local_path}")
         return load_from_disk(local_path)
 
-    # 否则从 HuggingFace 下载
     logger.info(f" ✅ Downloading {dataset_name} from HuggingFace...")
     if config['subset']:
         dataset = load_dataset(
@@ -40,7 +37,6 @@ def download_dataset(dataset_name: str, cache_dir: str = DATASET_CACHE_DIR) -> D
             cache_dir=cache_dir,
         )
 
-    # 保存到本地
     os.makedirs(os.path.dirname(local_path), exist_ok=True)
     dataset.save_to_disk(local_path)
     logger.info(f"Saved {dataset_name} to {local_path}")
