@@ -6,9 +6,9 @@ import os
 # ============================================================================
 # Directories
 # ============================================================================
-DATASET_CACHE_DIR = os.getenv('DATASET_CACHE_DIR', '/root/autodl-tmp/base_sft/dataset_cache')
-MODEL_CACHE_DIR = os.getenv('MODEL_CACHE_DIR', '/root/autodl-tmp/base_sft/model_cache')
-OUTPUT_DIR = os.getenv('OUTPUT_DIR', '/root/autodl-tmp/base_sft/outputs')
+DATASET_CACHE_DIR = os.getenv('DATASET_CACHE_DIR', '/xxx/xxx/base_sft/dataset_cache')
+MODEL_CACHE_DIR = os.getenv('MODEL_CACHE_DIR', '/xxx/xxx/base_sft/model_cache')
+OUTPUT_DIR = os.getenv('OUTPUT_DIR', '/xxx/xxx/base_sft/outputs')
 LOG_DIR = os.path.join(OUTPUT_DIR, 'logs')
 REPRESENTATION_DIR = os.path.join(OUTPUT_DIR, 'representations')
 CHECKPOINT_DIR = os.path.join(OUTPUT_DIR, 'checkpoints')
@@ -26,26 +26,23 @@ MODEL_CONFIGS = {
             'num_layers': 32,
         },
     },
-    'olmo2': {
-        # 1B: 完美的科研对象，拥有独立的 RLVR1 中间件 (基于您提供的 0425 版本)
+    'olmo2': { 
         '1b': {
             'base': 'allenai/OLMo-2-0425-1B',
             'sft': 'allenai/OLMo-2-0425-1B-SFT',
             'dpo': 'allenai/OLMo-2-0425-1B-DPO',
-            'rlvr': 'allenai/OLMo-2-0425-1B-RLVR1', # 独立的 RLVR 检查点
-            'instruct': 'allenai/OLMo-2-0425-1B-Instruct', # 最终成品
+            'rlvr': 'allenai/OLMo-2-0425-1B-RLVR1', 
+            'instruct': 'allenai/OLMo-2-0425-1B-Instruct', 
             'num_layers': 16, # Estimated for 1B size
         },
-        # 7B: 标准 Tulu 3 流程 (Base -> SFT -> DPO -> Instruct/RLVR)
         '7b': {
             'base': 'allenai/OLMo-2-1124-7B',
             'sft': 'allenai/OLMo-2-1124-7B-SFT',
             'dpo': 'allenai/OLMo-2-1124-7B-DPO',
-            'rlvr': 'allenai/OLMo-2-1124-7B-Instruct', # 7B/13B 的 Instruct 通常即为 RLVR 后的产物
+            'rlvr': 'allenai/OLMo-2-1124-7B-Instruct', 
             # 'instruct': 'allenai/OLMo-2-1124-7B-Instruct',
             'num_layers': 32, # Confirmed
         },
-        # 13B: 中间件齐全，适合做中等规模实验
         '13b': {
             'base': 'allenai/OLMo-2-1124-13B',
             'sft': 'allenai/OLMo-2-1124-13B-SFT',
@@ -54,11 +51,10 @@ MODEL_CONFIGS = {
             # 'instruct': 'allenai/OLMo-2-1124-13B-Instruct',
             'num_layers': 40, # Confirmed
         },
-        # 32B: 最新的大杯模型 (0325 版本)
         '32b': {
             'base': 'allenai/OLMo-2-0325-32B',
             'sft': 'allenai/OLMo-2-0325-32B-SFT',
-            'dpo': 'allenai/OLMo-2-0325-32B-DPO', # 存在于官方 Repo 树中
+            'dpo': 'allenai/OLMo-2-0325-32B-DPO', 
             'rlvr': 'allenai/OLMo-2-0325-32B-Instruct',
             # 'instruct': 'allenai/OLMo-2-0325-32B-Instruct',
             'num_layers': 64, # Estimated, verify with config.json
