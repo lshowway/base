@@ -65,7 +65,7 @@ def load_model(
             snapshot_download(
                 repo_id=model_path,
                 cache_dir=cache_dir,
-                max_workers=1,  # <--- 【添加这一行】强制使用单线程（一个文件一个文件下载）
+                max_workers=1, 
                 # If HF_TOKEN is set in environment, it will be used automatically
             )
             logger.info(f" ✅  Successfully downloaded {model_family}-{scale}-{variant} to {cache_dir}")
